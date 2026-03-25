@@ -1,50 +1,6 @@
 ﻿import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 
-function createMossPhotoTexture() {
-  const c = document.createElement('canvas');
-  c.width = 1024;
-  c.height = 1024;
-  const ctx = c.getContext('2d');
-
-  const base = ctx.createLinearGradient(0, 0, 0, c.height);
-  base.addColorStop(0, '#20311d');
-  base.addColorStop(0.45, '#3b5f2f');
-  base.addColorStop(1, '#6d8e3f');
-  ctx.fillStyle = base;
-  ctx.fillRect(0, 0, c.width, c.height);
-
-  for (let i = 0; i < 9000; i++) {
-    const x = Math.random() * c.width;
-    const y = Math.random() * c.height;
-    const r = 1 + Math.random() * 8;
-    const color = ['rgba(116,153,67,0.35)', 'rgba(171,189,88,0.25)', 'rgba(62,101,45,0.28)'][Math.floor(Math.random() * 3)];
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.arc(x, y, r, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  for (let i = 0; i < 220; i++) {
-    const x = Math.random() * c.width;
-    const y = Math.random() * c.height;
-    const w = 26 + Math.random() * 70;
-    const h = 10 + Math.random() * 30;
-    ctx.fillStyle = `rgba(220,240,170,${0.05 + Math.random() * 0.09})`;
-    ctx.beginPath();
-    ctx.ellipse(x, y, w, h, Math.random() * Math.PI, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.wrapS = THREE.RepeatWrapping;
-  tex.wrapT = THREE.RepeatWrapping;
-  tex.repeat.set(2.2, 2.2);
-  tex.anisotropy = 8;
-  return tex;
-}
-
 function createPanelTexture() {
   const c = document.createElement('canvas');
   c.width = 1024;
@@ -52,12 +8,12 @@ function createPanelTexture() {
   const ctx = c.getContext('2d');
 
   const lg = ctx.createLinearGradient(0, 0, c.width, c.height);
-  lg.addColorStop(0, '#f9fff5');
-  lg.addColorStop(1, '#ecf7e9');
+  lg.addColorStop(0, '#eef6e8');
+  lg.addColorStop(1, '#dce8d5');
   ctx.fillStyle = lg;
   ctx.fillRect(0, 0, c.width, c.height);
 
-  ctx.fillStyle = 'rgba(53,86,62,0.14)';
+  ctx.fillStyle = 'rgba(43,74,55,0.12)';
   ctx.fillRect(24, 24, c.width - 48, c.height - 48);
 
   ctx.fillStyle = '#1f3629';
@@ -67,7 +23,7 @@ function createPanelTexture() {
   ctx.fillText('Stenders_qi Nature Experience', 78, 245);
   ctx.fillText('Interactive Knowledge Panel', 78, 300);
 
-  ctx.strokeStyle = 'rgba(74,117,84,0.32)';
+  ctx.strokeStyle = 'rgba(74,117,84,0.28)';
   ctx.lineWidth = 2;
   ctx.strokeRect(44, 44, c.width - 88, c.height - 88);
 
@@ -75,6 +31,98 @@ function createPanelTexture() {
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.anisotropy = 4;
   return tex;
+}
+
+function addGrassField(scene, groundY) {
+  const blades = 1800;
+  const bladeGeo = new THREE.PlaneGeometry(0.02, 0.16, 1, 4);
+  bladeGeo.translate(0, 0.08, 0);
+
+  const phases = new Float32Array(blades);
+  const bends = new Float32Array(blades);
+  const colors = new Float32Array(blades * 3);
+
+  const colorA = new THREE.Color('#5c8747');
+  const colorB = new THREE.Color('#8cb666');
+  const tempColor = new THREE.Color();
+
+  for (let i = 0; i < blades; i++) {
+    phases[i] = Math.random() * Math.PI * 2;
+    bends[i] = 0.6 + Math.random() * 0.8;
+    tempColor.copy(colorA).lerp(colorB, Math.random());
+    colors[i * 3] = tempColor.r;
+    colors[i * 3 + 1] = tempColor.g;
+    colors[i * 3 + 2] = tempColor.b;
+  }
+
+  bladeGeo.setAttribute('aPhase', new THREE.InstancedBufferAttribute(phases, 1));
+  bladeGeo.setAttribute('aBend', new THREE.InstancedBufferAttribute(bends, 1));
+  bladeGeo.setAttribute('aColor', new THREE.InstancedBufferAttribute(colors, 3));
+
+  const mat = new THREE.MeshStandardMaterial({
+    color: '#6e9a4a',
+    roughness: 0.9,
+    metalness: 0,
+    side: THREE.DoubleSide,
+    vertexColors: true
+  });
+
+  mat.onBeforeCompile = (shader) => {
+    shader.uniforms.uTime = { value: 0 };
+    mat.userData.shader = shader;
+
+    shader.vertexShader = shader.vertexShader
+      .replace(
+        '#include <common>',
+        `#include <common>
+         attribute float aPhase;
+         attribute float aBend;
+         attribute vec3 aColor;
+         varying vec3 vInstColor;
+         uniform float uTime;`
+      )
+      .replace(
+        '#include <begin_vertex>',
+        `#include <begin_vertex>
+         float h = uv.y;
+         float sway = sin(uTime * 1.8 + aPhase + instanceMatrix[3][0] * 1.7) * 0.045 * h * aBend;
+         transformed.x += sway;
+         transformed.z += sway * 0.36;
+         vInstColor = aColor;`
+      );
+
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        '#include <common>',
+        `#include <common>
+         varying vec3 vInstColor;`
+      )
+      .replace(
+        'vec4 diffuseColor = vec4( diffuse, opacity );',
+        'vec4 diffuseColor = vec4( diffuse * vInstColor, opacity );'
+      );
+  };
+
+  const mesh = new THREE.InstancedMesh(bladeGeo, mat, blades);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+
+  const dummy = new THREE.Object3D();
+  for (let i = 0; i < blades; i++) {
+    const x = (Math.random() - 0.5) * 2.5;
+    const z = 0.05 + Math.random() * 1.25;
+    const y = groundY + Math.random() * 0.03;
+
+    dummy.position.set(x, y, z);
+    dummy.rotation.y = Math.random() * Math.PI;
+    const s = 0.8 + Math.random() * 1.3;
+    dummy.scale.set(s, 0.8 + Math.random() * 1.4, s);
+    dummy.updateMatrix();
+    mesh.setMatrixAt(i, dummy.matrix);
+  }
+
+  scene.add(mesh);
+  return mesh;
 }
 
 export default function KnowledgeInteractive3D() {
@@ -85,11 +133,11 @@ export default function KnowledgeInteractive3D() {
     if (!host) return undefined;
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xfaf8f3);
+    scene.background = new THREE.Color(0xe9efe3);
 
     const camera = new THREE.PerspectiveCamera(36, host.clientWidth / host.clientHeight, 0.01, 30);
     camera.position.set(0, 0.12, 2.5);
-    camera.lookAt(0, 0, 0);
+    camera.lookAt(0, 0, 0.2);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.8));
@@ -98,11 +146,11 @@ export default function KnowledgeInteractive3D() {
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     host.appendChild(renderer.domElement);
 
-    const hemi = new THREE.HemisphereLight(0xffffff, 0xe8efe3, 0.7);
+    const hemi = new THREE.HemisphereLight(0xf6faef, 0xc9d7bf, 0.75);
     scene.add(hemi);
 
-    const key = new THREE.DirectionalLight(0xffffff, 1.08);
-    key.position.set(1.2, 1.8, 1.4);
+    const key = new THREE.DirectionalLight(0xffffff, 1.12);
+    key.position.set(1.2, 1.9, 1.6);
     key.castShadow = true;
     key.shadow.mapSize.set(1024, 1024);
     key.shadow.camera.left = -2;
@@ -111,55 +159,39 @@ export default function KnowledgeInteractive3D() {
     key.shadow.camera.bottom = -2;
     scene.add(key);
 
-    const rim = new THREE.DirectionalLight(0xf6fff0, 0.52);
-    rim.position.set(-1.4, 0.9, 1.2);
-    scene.add(rim);
+    const fill = new THREE.DirectionalLight(0xf1f8e8, 0.42);
+    fill.position.set(-1.2, 1.0, 1.2);
+    scene.add(fill);
 
-    const mossTex = createMossPhotoTexture();
-    const groundMat = new THREE.MeshStandardMaterial({
-      map: mossTex,
-      roughness: 0.92,
-      metalness: 0.02
-    });
+    const groundY = -0.73;
 
-    const ground = new THREE.Mesh(new THREE.CircleGeometry(2.2, 96), groundMat);
+    const ground = new THREE.Mesh(
+      new THREE.PlaneGeometry(3.2, 2.2, 60, 30),
+      new THREE.MeshStandardMaterial({ color: '#7fa168', roughness: 1, metalness: 0 })
+    );
     ground.rotation.x = -Math.PI / 2;
-    ground.position.y = -0.73;
+    ground.position.y = groundY;
     ground.receiveShadow = true;
     scene.add(ground);
 
-    const mossEdge = new THREE.Mesh(
-      new THREE.PlaneGeometry(2.8, 0.62),
-      new THREE.MeshStandardMaterial({ map: mossTex, roughness: 0.95, metalness: 0.01 })
-    );
-    mossEdge.position.set(0, -0.48, 0.64);
-    mossEdge.rotation.x = -0.18;
-    mossEdge.receiveShadow = true;
-    scene.add(mossEdge);
+    const gPos = ground.geometry.attributes.position;
+    for (let i = 0; i < gPos.count; i++) {
+      const x = gPos.getX(i);
+      const y = gPos.getY(i);
+      const wave = Math.sin(x * 2.8) * 0.015 + Math.cos(y * 4.1) * 0.01 + (Math.random() - 0.5) * 0.01;
+      gPos.setZ(i, wave);
+    }
+    gPos.needsUpdate = true;
+    ground.geometry.computeVertexNormals();
 
-    const makeBathBall = (x, z, color) => {
-      const m = new THREE.Mesh(
-        new THREE.SphereGeometry(0.08, 28, 28),
-        new THREE.MeshPhysicalMaterial({
-          color,
-          roughness: 0.48,
-          metalness: 0,
-          clearcoat: 0.55,
-          clearcoatRoughness: 0.35
-        })
-      );
-      m.position.set(x, -0.62, z);
-      m.castShadow = true;
-      scene.add(m);
-      return m;
-    };
+    const grassMesh = addGrassField(scene, groundY + 0.01);
 
     const makeRock = (x, z, s) => {
       const m = new THREE.Mesh(
         new THREE.DodecahedronGeometry(s, 0),
-        new THREE.MeshStandardMaterial({ color: 0xb8b0a2, roughness: 0.96, metalness: 0.03 })
+        new THREE.MeshStandardMaterial({ color: '#b7b09f', roughness: 0.95, metalness: 0.03 })
       );
-      m.position.set(x, -0.64 + s * 0.3, z);
+      m.position.set(x, groundY + s * 0.45, z);
       m.rotation.set(Math.random() * 0.3, Math.random() * Math.PI, Math.random() * 0.2);
       m.castShadow = true;
       scene.add(m);
@@ -167,11 +199,8 @@ export default function KnowledgeInteractive3D() {
     };
 
     const decor = [
-      makeBathBall(-0.88, -0.34, 0xf1d7df),
-      makeBathBall(-0.98, -0.12, 0xd9edd2),
-      makeBathBall(0.96, -0.26, 0xf4e7c5),
-      makeRock(1.08, 0.14, 0.12),
-      makeRock(-1.12, 0.08, 0.1)
+      makeRock(1.02, 0.3, 0.12),
+      makeRock(-1.05, 0.16, 0.1)
     ];
 
     const w = 1.25;
@@ -218,9 +247,9 @@ export default function KnowledgeInteractive3D() {
       side: THREE.DoubleSide,
       roughness: 0.54,
       metalness: 0.02,
-      clearcoat: 0.25,
+      clearcoat: 0.24,
       clearcoatRoughness: 0.36,
-      sheen: 0.25,
+      sheen: 0.22,
       sheenColor: new THREE.Color(0xcde0cf)
     });
 
@@ -263,7 +292,7 @@ export default function KnowledgeInteractive3D() {
       }
     }
 
-    const anchorIndices = [id(0, 0), id(Math.floor(segX / 2), 0), id(segX, 0)];
+    const topRowIndices = Array.from({ length: cols }, (_, x) => id(x, 0));
 
     const raycaster = new THREE.Raycaster();
     const mouse = new THREE.Vector2();
@@ -363,10 +392,12 @@ export default function KnowledgeInteractive3D() {
       }
     };
 
-    const applySoftAnchors = () => {
-      for (const i of anchorIndices) {
+    const applyTopEdgeConstraint = () => {
+      for (const i of topRowIndices) {
         const p = particles[i];
-        p.pos.lerp(p.pin, 0.18);
+        // Keep the whole top edge straight and level while lower area remains soft.
+        p.pos.copy(p.pin);
+        p.prev.copy(p.pin);
       }
     };
 
@@ -415,7 +446,7 @@ export default function KnowledgeInteractive3D() {
           p1.pos.addScaledVector(corr, fac * diff);
           p2.pos.addScaledVector(corr, -fac * diff);
         }
-        applySoftAnchors();
+        applyTopEdgeConstraint();
       }
 
       applyBoundsAndGround();
@@ -442,6 +473,10 @@ export default function KnowledgeInteractive3D() {
         simulate(fixed);
         acc -= fixed;
         steps += 1;
+      }
+
+      if (grassMesh.material.userData.shader) {
+        grassMesh.material.userData.shader.uniforms.uTime.value = clock.elapsedTime;
       }
 
       for (let i = 0; i < particles.length; i++) {
@@ -480,9 +515,8 @@ export default function KnowledgeInteractive3D() {
       material.dispose();
       ground.geometry.dispose();
       ground.material.dispose();
-      mossEdge.geometry.dispose();
-      mossEdge.material.dispose();
-      mossTex.dispose();
+      grassMesh.geometry.dispose();
+      grassMesh.material.dispose();
       decor.forEach((m) => {
         m.geometry.dispose();
         m.material.dispose();
@@ -496,9 +530,10 @@ export default function KnowledgeInteractive3D() {
     <section className="panel knowledge-3d-panel">
       <div className="knowledge-3d-head">
         <h2 className="section-title">3D 知识交互面板</h2>
-        <p className="hint">软锚点防掉落，苔藓草地场景与自然材质渲染</p>
+        <p className="hint">生态草地、风过草影与柔和自然光场</p>
       </div>
       <div ref={stageRef} className="knowledge-3d-stage" />
     </section>
   );
 }
+

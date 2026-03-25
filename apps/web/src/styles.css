@@ -458,3 +458,12 @@ body.theme-stenders_qi .knowledge-3d-stage {
     radial-gradient(circle at 84% 84%, rgba(242, 203, 161, 0.34) 0%, rgba(242, 203, 161, 0.09) 30%, transparent 58%),
     linear-gradient(180deg, #f8fbf6 0%, #ecf3e8 100%);
 }
+
+body.theme-stenders_qi .knowledge-3d-stage {
+  background:
+    radial-gradient(circle at 16% 16%, rgba(184, 203, 165, 0.58) 0%, rgba(184, 203, 165, 0.16) 34%, transparent 62%),
+    radial-gradient(circle at 84% 24%, rgba(150, 181, 132, 0.5) 0%, rgba(150, 181, 132, 0.14) 32%, transparent 58%),
+    linear-gradient(180deg, #dbe5d2 0%, #cdd9c2 100%);
+}
+
+
