@@ -1,0 +1,47 @@
+﻿services:
+  db:
+    image: postgres:16-alpine
+    container_name: itkb-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-itkb}
+    volumes:
+      - itkb_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  api:
+    build:
+      context: ../apps/api
+    container_name: itkb-api
+    environment:
+      PORT: 4000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-itkb}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost}
+      ADMIN_KEY: ${ADMIN_KEY:-replace_with_a_strong_key}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ../apps/web
+    container_name: itkb-web
+
+  gateway:
+    image: nginx:1.27-alpine
+    container_name: itkb-gateway
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/site.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - api
+      - web
+
+volumes:
+  itkb_pg_data:
