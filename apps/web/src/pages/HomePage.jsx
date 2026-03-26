@@ -14,7 +14,7 @@ export default function HomePage() {
   const subtitle = useMemo(() => {
     if (selectedTag) return `当前按标签「${selectedTag}」筛选`;
     if (q.trim()) return `当前关键词「${q.trim()}」`;
-    return '自然简洁风格的 IT 知识空间，快速检索与单页直达';
+    return 'Stitch 精选模板风格知识空间，卡片化检索与单页直达';
   }, [q, selectedTag]);
 
   const filteredGuides = useMemo(() => {
@@ -57,13 +57,13 @@ export default function HomePage() {
           />
         </div>
 
-        <h2 className="section-title">stenders_qi 模板目录</h2>
+        <h2 className="section-title">Stitch 精选模板目录</h2>
         <div className="grid quick-grid">
           <Link to="/lab/receipt" className="card quick-card">
-            <h3>stenders_qi 目录检索台</h3>
+            <h3>Stitch 目录检索台</h3>
             <p>目录内容已替换到小票模板，点击即可完成检索并跳转详情。</p>
             <div className="meta-row">
-              <span>Template: stenders_qi</span>
+              <span>Template: stitch_curated</span>
               <span>已记忆</span>
             </div>
           </Link>
@@ -118,4 +118,5 @@ export default function HomePage() {
     </div>
   );
 }
+
 
