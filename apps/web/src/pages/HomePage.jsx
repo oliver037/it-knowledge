@@ -1,8 +1,22 @@
 ﻿import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { getArticles, getTags } from '../api';
+import { createArticle, getArticles, getTags, setAdminKey } from '../api';
 import { quickGuides, TEMPLATE_STENDERS_QI } from '../quickGuides';
 import KnowledgeInteractive3D from '../components/KnowledgeInteractive3D';
+
+const emptySubmitForm = {
+  title: '',
+  summary: '',
+  tagsText: '',
+  content: ''
+};
+
+function parseTags(tagsText) {
+  return (tagsText || '')
+    .split(',')
+    .map((tag) => tag.trim())
+    .filter(Boolean);
+}
 
 export default function HomePage() {
   const [q, setQ] = useState('');
@@ -10,6 +24,11 @@ export default function HomePage() {
   const [tags, setTags] = useState([]);
   const [loading, setLoading] = useState(false);
   const [articles, setArticles] = useState([]);
+
+  const [submitForm, setSubmitForm] = useState(emptySubmitForm);
+  const [submitKey, setSubmitKey] = useState('');
+  const [submitLoading, setSubmitLoading] = useState(false);
+  const [submitMessage, setSubmitMessage] = useState('');
 
   const subtitle = useMemo(() => {
     if (selectedTag) return `当前按标签「${selectedTag}」筛选`;
@@ -25,17 +44,57 @@ export default function HomePage() {
     });
   }, [q]);
 
+  async function loadArticles() {
+    setLoading(true);
+    try {
+      const res = await getArticles({ q, tag: selectedTag, page: 1, limit: 20 });
+      setArticles(res.data);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   useEffect(() => {
     localStorage.setItem('kb_template_name', TEMPLATE_STENDERS_QI);
+    const cachedKey = localStorage.getItem('itkb_admin_key') || '';
+    setSubmitKey(cachedKey);
+    setAdminKey(cachedKey);
     getTags().then(setTags).catch(() => setTags([]));
   }, []);
 
   useEffect(() => {
-    setLoading(true);
-    getArticles({ q, tag: selectedTag, page: 1, limit: 20 })
-      .then((res) => setArticles(res.data))
-      .finally(() => setLoading(false));
+    loadArticles();
   }, [q, selectedTag]);
+
+  async function onSubmitArticle(event) {
+    event.preventDefault();
+    const safeKey = submitKey.trim();
+    if (!safeKey) {
+      setSubmitMessage('请先填写管理密钥后再提交。');
+      return;
+    }
+
+    const payload = {
+      title: submitForm.title,
+      summary: submitForm.summary,
+      tags: parseTags(submitForm.tagsText),
+      content: submitForm.content
+    };
+
+    try {
+      setSubmitLoading(true);
+      setAdminKey(safeKey);
+      localStorage.setItem('itkb_admin_key', safeKey);
+      await createArticle(payload);
+      setSubmitForm(emptySubmitForm);
+      setSubmitMessage('提交成功，已发布到知识库。');
+      await Promise.all([loadArticles(), getTags().then(setTags).catch(() => setTags([]))]);
+    } catch (error) {
+      setSubmitMessage(error.response?.data?.message || '提交失败，请检查管理密钥或内容格式。');
+    } finally {
+      setSubmitLoading(false);
+    }
+  }
 
   return (
     <div>
@@ -56,6 +115,61 @@ export default function HomePage() {
             placeholder="检索目录 / 知识文章..."
           />
         </div>
+
+        <h2 className="section-title">内容提交发布</h2>
+        <form className="form-grid" onSubmit={onSubmitArticle}>
+          <label>
+            管理密钥（ADMIN_KEY）
+            <input
+              type="password"
+              value={submitKey}
+              onChange={(e) => setSubmitKey(e.target.value)}
+              placeholder="输入管理密钥后可提交发布"
+            />
+          </label>
+          <label>
+            标题
+            <input
+              value={submitForm.title}
+              onChange={(e) => setSubmitForm({ ...submitForm, title: e.target.value })}
+              placeholder="例如：Windows 蓝屏快速排障"
+              required
+            />
+          </label>
+          <label>
+            摘要
+            <input
+              value={submitForm.summary}
+              onChange={(e) => setSubmitForm({ ...submitForm, summary: e.target.value })}
+              placeholder="一句话描述本条知识"
+            />
+          </label>
+          <label>
+            标签（逗号分隔）
+            <input
+              value={submitForm.tagsText}
+              onChange={(e) => setSubmitForm({ ...submitForm, tagsText: e.target.value })}
+              placeholder="Windows, 排障, 运维"
+            />
+          </label>
+          <label>
+            正文
+            <textarea
+              rows={8}
+              value={submitForm.content}
+              onChange={(e) => setSubmitForm({ ...submitForm, content: e.target.value })}
+              placeholder="写入可执行步骤、命令和注意事项"
+              required
+            />
+          </label>
+          <div className="actions">
+            <button className="btn-primary" type="submit" disabled={submitLoading}>
+              {submitLoading ? '提交中...' : '提交并发布'}
+            </button>
+            <Link className="btn-ghost" to="/admin">进入管理控制台（更新/删除）</Link>
+          </div>
+          {submitMessage && <p className="hint">{submitMessage}</p>}
+        </form>
 
         <h2 className="section-title">Stitch 精选模板目录</h2>
         <div className="grid quick-grid">
@@ -118,5 +232,3 @@ export default function HomePage() {
     </div>
   );
 }
-
-
