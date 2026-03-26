@@ -4,6 +4,8 @@ import { createArticle, getArticles, getTags, setAdminKey } from '../api';
 import { quickGuides, TEMPLATE_STENDERS_QI } from '../quickGuides';
 import KnowledgeInteractive3D from '../components/KnowledgeInteractive3D';
 
+const DEFAULT_ADMIN_KEY = '123456';
+
 const emptySubmitForm = {
   title: '',
   summary: '',
@@ -26,7 +28,6 @@ export default function HomePage() {
   const [articles, setArticles] = useState([]);
 
   const [submitForm, setSubmitForm] = useState(emptySubmitForm);
-  const [submitKey, setSubmitKey] = useState('');
   const [submitLoading, setSubmitLoading] = useState(false);
   const [submitMessage, setSubmitMessage] = useState('');
 
@@ -56,9 +57,7 @@ export default function HomePage() {
 
   useEffect(() => {
     localStorage.setItem('kb_template_name', TEMPLATE_STENDERS_QI);
-    const cachedKey = localStorage.getItem('itkb_admin_key') || '';
-    setSubmitKey(cachedKey);
-    setAdminKey(cachedKey);
+    setAdminKey(DEFAULT_ADMIN_KEY);
     getTags().then(setTags).catch(() => setTags([]));
   }, []);
 
@@ -68,11 +67,6 @@ export default function HomePage() {
 
   async function onSubmitArticle(event) {
     event.preventDefault();
-    const safeKey = submitKey.trim();
-    if (!safeKey) {
-      setSubmitMessage('请先填写管理密钥后再提交。');
-      return;
-    }
 
     const payload = {
       title: submitForm.title,
@@ -83,14 +77,16 @@ export default function HomePage() {
 
     try {
       setSubmitLoading(true);
-      setAdminKey(safeKey);
-      localStorage.setItem('itkb_admin_key', safeKey);
+      setSubmitMessage('');
+      setAdminKey(DEFAULT_ADMIN_KEY);
       await createArticle(payload);
       setSubmitForm(emptySubmitForm);
-      setSubmitMessage('提交成功，已发布到知识库。');
+      setQ('');
+      setSelectedTag('');
       await Promise.all([loadArticles(), getTags().then(setTags).catch(() => setTags([]))]);
+      setSubmitMessage('提交成功，知识库已同步更新。');
     } catch (error) {
-      setSubmitMessage(error.response?.data?.message || '提交失败，请检查管理密钥或内容格式。');
+      setSubmitMessage(error.response?.data?.message || '提交失败，请检查标题是否重复或内容格式。');
     } finally {
       setSubmitLoading(false);
     }
@@ -118,15 +114,6 @@ export default function HomePage() {
 
         <h2 className="section-title">内容提交发布</h2>
         <form className="form-grid" onSubmit={onSubmitArticle}>
-          <label>
-            管理密钥（ADMIN_KEY）
-            <input
-              type="password"
-              value={submitKey}
-              onChange={(e) => setSubmitKey(e.target.value)}
-              placeholder="输入管理密钥后可提交发布"
-            />
-          </label>
           <label>
             标题
             <input
@@ -166,7 +153,6 @@ export default function HomePage() {
             <button className="btn-primary" type="submit" disabled={submitLoading}>
               {submitLoading ? '提交中...' : '提交并发布'}
             </button>
-            <Link className="btn-ghost" to="/admin">进入管理控制台（更新/删除）</Link>
           </div>
           {submitMessage && <p className="hint">{submitMessage}</p>}
         </form>

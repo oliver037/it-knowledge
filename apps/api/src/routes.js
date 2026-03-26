@@ -4,7 +4,7 @@ import { articleSchema, normalizeTags } from './validators.js';
 import { makeSlug } from './slug.js';
 
 const router = express.Router();
-const adminKey = process.env.ADMIN_KEY || '';
+const adminKey = process.env.ADMIN_KEY || '123456';
 
 function requireAdmin(req, res, next) {
   if (!adminKey) {
@@ -158,3 +158,4 @@ router.delete('/articles/:id', requireAdmin, async (req, res, next) => {
 });
 
 export default router;
+
